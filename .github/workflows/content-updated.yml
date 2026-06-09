@@ -118,13 +118,13 @@ jobs:
           PACZKA_BASE_URL: ${{ secrets.PACZKA_BASE_URL }}
           PACZKA_SERVICE_TOKEN: ${{ secrets.PACZKA_SERVICE_TOKEN }}
         run: |
-          curl -sf -X POST "${PACZKA_BASE_URL}/admin/git-pull" \
-            -H "Authorization: Bearer ${PACZKA_SERVICE_TOKEN}" || echo "git-pull failed"
+          curl -X POST "${PACZKA_BASE_URL}/admin/git-pull" \
+            -H "Authorization: Bearer ${PACZKA_SERVICE_TOKEN}"
 
       - name: Trigger admin reindex
         env:
           PACZKA_BASE_URL: ${{ secrets.PACZKA_BASE_URL }}
           PACZKA_SERVICE_TOKEN: ${{ secrets.PACZKA_SERVICE_TOKEN }}
         run: |
-          curl -sf -X POST "${PACZKA_BASE_URL}/admin/reindex" \
-            -H "Authorization: Bearer ${PACZKA_SERVICE_TOKEN}" || echo "reindex failed"
+          curl -X POST "${PACZKA_BASE_URL}/admin/reindex" \
+            -H "Authorization: Bearer ${PACZKA_SERVICE_TOKEN}"
