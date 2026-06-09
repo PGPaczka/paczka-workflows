@@ -1,0 +1,130 @@
+name: "Hub: Content Updated (paczka-content)"
+
+on:
+  repository_dispatch:
+    types: [content-updated]
+
+# Dispatched by paczka-content on merge to master (paths: paczka/**)
+# Payload:
+#   client_payload.repo – "PaczkaInfaPG-Code/paczka-content"
+#   client_payload.sha  – commit SHA
+
+concurrency:
+  group: content-updated
+  cancel-in-progress: true
+
+jobs:
+  sync-gdrive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout paczka-content
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.client_payload.repo }}
+          ref: ${{ github.event.client_payload.sha }}
+          path: content
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+
+      - name: Checkout gdrive-sync
+        uses: actions/checkout@v4
+        with:
+          repository: PaczkaInfaPG-Code/gdrive-split
+          path: gdrive-sync
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install gdrive dependencies
+        run: pip install -r gdrive-sync/requirements.txt
+
+      - name: Restore GDrive credentials
+        run: |
+          echo "${{ secrets.GDRIVE_CREDENTIALS_B64 }}" | base64 -d > gdrive-sync/credentials.json
+          echo "${{ secrets.GDRIVE_TOKEN_B64 }}" | base64 -d > gdrive-sync/token_drive_v3.pickle
+
+      - name: Sync to Google Drive
+        env:
+          LOCAL_FOLDER: content/paczka
+        run: python gdrive-sync/gdrive_update.py
+
+  generate-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout paczka-content
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.client_payload.repo }}
+          ref: ${{ github.event.client_payload.sha }}
+          path: content
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+
+      - name: Checkout metadata-generator
+        uses: actions/checkout@v4
+        with:
+          repository: PaczkaInfaPG-Code/Metadata-Generator
+          path: metadata-generator
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: metadata-generator/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+        working-directory: metadata-generator
+
+      - name: Run metadata generator
+        env:
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        run: |
+          CSV_PATH="../content/paczka_meta/metadata.csv"
+
+          if [ ! -f "$CSV_PATH" ]; then
+            echo "CSV file not found: $CSV_PATH"
+            exit 1
+          fi
+
+          npm run generate -- --import-csv "$CSV_PATH"
+          npm run generate -- --root "../content/paczka" -r --limit 50 --only-skipped
+          npm run generate -- --csv "$CSV_PATH"
+        working-directory: metadata-generator
+
+      - name: Push updated metadata back to paczka-content
+        run: |
+          cd content
+          if [ -z "$(git status --porcelain -- paczka_meta/metadata.csv)" ]; then
+            echo "No metadata changes"
+            exit 0
+          fi
+          git add paczka_meta/metadata.csv
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore: update metadata.csv [skip ci]"
+          git push
+
+  notify-server:
+    needs: [sync-gdrive, generate-metadata]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger admin git pull
+        env:
+          PACZKA_BASE_URL: ${{ secrets.PACZKA_BASE_URL }}
+          PACZKA_SERVICE_TOKEN: ${{ secrets.PACZKA_SERVICE_TOKEN }}
+        run: |
+          curl -sf -X POST "${PACZKA_BASE_URL}/admin/git-pull" \
+            -H "Authorization: Bearer ${PACZKA_SERVICE_TOKEN}" || echo "git-pull failed"
+
+      - name: Trigger admin reindex
+        env:
+          PACZKA_BASE_URL: ${{ secrets.PACZKA_BASE_URL }}
+          PACZKA_SERVICE_TOKEN: ${{ secrets.PACZKA_SERVICE_TOKEN }}
+        run: |
+          curl -sf -X POST "${PACZKA_BASE_URL}/admin/reindex" \
+            -H "Authorization: Bearer ${PACZKA_SERVICE_TOKEN}" || echo "reindex failed"
