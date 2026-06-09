@@ -106,10 +106,9 @@ jobs:
           git -c user.name="github-actions[bot]" \
               -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
               commit -m "chore: update metadata.csv [skip ci]"
-          git push
+          git push origin HEAD:master
 
   notify-server:
-    needs: [sync-gdrive, generate-metadata]
     if: always()
     runs-on: ubuntu-latest
     steps:
