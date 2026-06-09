@@ -28,7 +28,7 @@ jobs:
       - name: Checkout gdrive-sync
         uses: actions/checkout@v4
         with:
-          repository: PaczkaInfaPG-Code/gdrive-split
+          repository: PGPaczka/paczka-gdrive-sync
           path: gdrive-sync
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
 
