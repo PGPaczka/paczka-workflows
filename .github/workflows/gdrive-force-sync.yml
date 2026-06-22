@@ -1,0 +1,57 @@
+name: "GDrive: Force Sync (no cache)"
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: gdrive-sync
+  cancel-in-progress: true
+
+jobs:
+  force-sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout paczka-content
+        uses: actions/checkout@v4
+        with:
+          repository: pgPaczka/paczka-content
+          ref: master
+          path: content
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+
+      - name: Checkout gdrive-sync
+        uses: actions/checkout@v4
+        with:
+          repository: PGPaczka/paczka-gdrive-sync
+          path: gdrive-sync
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r gdrive-sync/requirements.txt
+
+      - name: Delete existing cache
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh cache delete gdrive-listing-v1 --repo ${{ github.repository }} || true
+
+      - name: Sync to Google Drive (fresh scan)
+        env:
+          LOCAL_FOLDER: ../content/paczka
+          GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
+          GDRIVE_CACHE_FILE: gdrive_cache.json
+          GDRIVE_CREDENTIALS_B64: ${{ secrets.GDRIVE_CREDENTIALS_B64 }}
+          GDRIVE_TOKEN_B64: ${{ secrets.GDRIVE_TOKEN_B64 }}
+        working-directory: gdrive-sync
+        run: python gdrive_update.py
+
+      - name: Save new cache
+        uses: actions/cache/save@v4
+        with:
+          path: gdrive-sync/gdrive_cache.json
+          key: gdrive-listing-v1

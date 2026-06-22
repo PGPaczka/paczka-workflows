@@ -40,15 +40,29 @@ jobs:
       - name: Install gdrive dependencies
         run: pip install -r gdrive-sync/requirements.txt
 
-      - name: Restore GDrive credentials
-        run: |
-          echo "${{ secrets.GDRIVE_CREDENTIALS_B64 }}" | base64 -d > gdrive-sync/credentials.json
-          echo "${{ secrets.GDRIVE_TOKEN_B64 }}" | base64 -d > gdrive-sync/token_drive_v3.pickle
+      - name: Restore GDrive cache
+        id: gdrive-cache
+        uses: actions/cache@v4
+        with:
+          path: gdrive-sync/gdrive_cache.json
+          key: gdrive-listing-v1
 
       - name: Sync to Google Drive
         env:
-          LOCAL_FOLDER: content/paczka
-        run: python gdrive-sync/gdrive_update.py
+          LOCAL_FOLDER: ../content/paczka
+          GDRIVE_FOLDER_ID: ${{ vars.GDRIVE_FOLDER_ID }}
+          GDRIVE_CACHE_FILE: gdrive_cache.json
+          GDRIVE_CREDENTIALS_B64: ${{ secrets.GDRIVE_CREDENTIALS_B64 }}
+          GDRIVE_TOKEN_B64: ${{ secrets.GDRIVE_TOKEN_B64 }}
+        working-directory: gdrive-sync
+        run: python gdrive_update.py
+
+      - name: Save GDrive cache
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: gdrive-sync/gdrive_cache.json
+          key: gdrive-listing-v1
 
   generate-metadata:
     runs-on: ubuntu-latest
