@@ -44,10 +44,11 @@ jobs:
 
       - name: Restore GDrive cache
         id: gdrive-cache
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: gdrive-sync/gdrive_cache.json
-          key: gdrive-listing-v1
+          key: gdrive-listing-${{ github.run_id }}
+          restore-keys: gdrive-listing-
 
       - name: Sync to Google Drive
         env:
@@ -64,7 +65,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: gdrive-sync/gdrive_cache.json
-          key: gdrive-listing-v1
+          key: gdrive-listing-${{ github.run_id }}
 
   generate-metadata:
     runs-on: ubuntu-latest

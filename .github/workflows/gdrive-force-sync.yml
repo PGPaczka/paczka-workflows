@@ -36,12 +36,6 @@ jobs:
       - name: Install dependencies
         run: pip install -r gdrive-sync/requirements.txt
 
-      - name: Delete existing cache
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          gh cache delete gdrive-listing-v1 --repo ${{ github.repository }} || true
-
       - name: Sync to Google Drive (fresh scan)
         env:
           LOCAL_FOLDER: ../content/paczka
@@ -56,4 +50,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: gdrive-sync/gdrive_cache.json
-          key: gdrive-listing-v1
+          key: gdrive-listing-${{ github.run_id }}
