@@ -24,6 +24,7 @@ jobs:
           ref: ${{ github.event.client_payload.sha }}
           path: content
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Checkout gdrive-sync
         uses: actions/checkout@v4
@@ -31,6 +32,7 @@ jobs:
           repository: PGPaczka/paczka-gdrive-sync
           path: gdrive-sync
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -74,6 +76,7 @@ jobs:
           ref: ${{ github.event.client_payload.sha }}
           path: content
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Checkout metadata-generator
         uses: actions/checkout@v4
@@ -81,6 +84,7 @@ jobs:
           repository: PaczkaInfaPG-Code/Metadata-Generator
           path: metadata-generator
           token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          fetch-depth: 1
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
