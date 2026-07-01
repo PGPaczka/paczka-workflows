@@ -1,0 +1,82 @@
+name: "Metadata: Generate (manual)"
+
+on:
+  workflow_dispatch:
+    inputs:
+      limit:
+        description: "Max files to generate metadata for (0 = unlimited)"
+        default: "50"
+        required: false
+
+concurrency:
+  group: generate-metadata
+  cancel-in-progress: true
+
+jobs:
+  generate-metadata:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout paczka-content
+        uses: actions/checkout@v4
+        with:
+          repository: PGPaczka/paczka-content
+          ref: master
+          path: content
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Checkout metadata-generator
+        uses: actions/checkout@v4
+        with:
+          repository: PGPaczka/Metadata-Generator
+          path: metadata-generator
+          token: ${{ secrets.PAT_GITHUB_TOKEN }}
+          fetch-depth: 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: metadata-generator/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci --prefer-offline --no-audit --no-fund
+        working-directory: metadata-generator
+
+      - name: Run metadata generator
+        env:
+          GOOGLE_AI_API_KEY: ${{ secrets.GOOGLE_AI_API_KEY }}
+        run: |
+          CSV_PATH="../content/paczka_meta/metadata.csv"
+
+          if [ ! -f "$CSV_PATH" ]; then
+            echo "CSV file not found: $CSV_PATH"
+            exit 1
+          fi
+
+          LIMIT="${{ inputs.limit }}"
+
+          npm run generate -- --import-csv "$CSV_PATH"
+
+          GENERATE_ARGS="--root ../content/paczka -r --only-skipped"
+          if [ "$LIMIT" != "0" ]; then
+            GENERATE_ARGS="$GENERATE_ARGS --limit $LIMIT"
+          fi
+
+          npm run generate -- $GENERATE_ARGS
+          npm run generate -- --csv "$CSV_PATH"
+        working-directory: metadata-generator
+
+      - name: Push updated metadata back to paczka-content
+        run: |
+          cd content
+          if [ -z "$(git status --porcelain -- paczka_meta/metadata.csv)" ]; then
+            echo "No metadata changes"
+            exit 0
+          fi
+          git add paczka_meta/metadata.csv
+          git -c user.name="github-actions[bot]" \
+              -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+              commit -m "chore: update metadata.csv [skip ci]"
+          git push origin HEAD:master
